@@ -4,24 +4,30 @@ x-db-credentials: &db-credentials
   POSTGRES_DB: &db-name ${POSTGRES_DB}
 
 services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - listmonk
+
   # listmonk app
   app:
     image: listmonk/listmonk:latest
     container_name: listmonk_app
     restart: unless-stopped
-    ports:
-      - "9000:9000"                                           # To change the externally exposed port, change to: $custom_port:9000
     networks:
       - listmonk
-    hostname: listmonk.example.com                            # Recommend using FQDN for hostname
-    # depends_on:
-    #   - db
+    hostname: listmonk.example.com
     command: [sh, -c, "./listmonk --install --idempotent --yes --config '' && ./listmonk --upgrade --yes --config '' && ./listmonk --config ''"]
-                                                              # --config (file) param is set to empty so that listmonk only uses the env vars (below) for config.
-                                                              # --install --idempotent ensures that DB installation happens only once on an empty DB, on the first ever start.
-                                                              # --upgrade automatically runs any DB migrations when a new image is pulled.
 
-    environment:                                              # The same params as in config.toml are passed as env vars here.
+    environment:
       LISTMONK_app__address: 0.0.0.0:9000
       LISTMONK_db__user: *db-user
       LISTMONK_db__password: *db-password
@@ -33,35 +39,16 @@ services:
       LISTMONK_db__max_idle: 25
       LISTMONK_db__max_lifetime: 300s
       TZ: Etc/UTC
-      LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:-}           # If these (optional) are set during the first `docker compose up`, then the Super Admin user is automatically created.
-      LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:-}   # Otherwise, the user can be setup on the web app after the first visit to http://localhost:9000
+      LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:-}
+      LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:-}
     volumes:
-      - ./uploads:/listmonk/uploads:rw                        # Mount an uploads directory on the host to /listmonk/uploads inside the container.
-                                                              # To use this, change directory path in Admin -> Settings -> Media to /listmonk/uploads
-
-  # Postgres database
-  # db:
-  #   image: postgres:17-alpine
-  #   container_name: listmonk_db
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5432:5432"
-  #   networks:
-  #     - listmonk
-  #   environment:
-  #     <<: *db-credentials
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U listmonk"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 6
-  #   volumes:
-  #     - type: volume
-  #       source: listmonk-data
-  #       target: /var/lib/postgresql/data
+      - ./uploads:/listmonk/uploads:rw
 
 networks:
   listmonk:
+    name: listmonk
 
 volumes:
   listmonk-data:
+  caddy_data:
+  caddy_config:

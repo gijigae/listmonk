@@ -1,0 +1,6 @@
+news.anzennow.com {
+    reverse_proxy listmonk_app:9000
+    tls {
+        protocols tls1.2 tls1.3
+    }
+} 
